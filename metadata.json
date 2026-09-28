@@ -1,0 +1,6 @@
+{
+  "name": "Nexora SalonOS",
+  "description": "The ultra-luxury salon operating system. Elevate your brand with automated elite white-label websites, smart AI bookings, premium Nexora QR payments, and deep client retention loops.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
