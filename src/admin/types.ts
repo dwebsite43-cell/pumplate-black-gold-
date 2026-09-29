@@ -234,3 +234,31 @@ export interface ComplaintAppeal {
   resolutionNotes?: string;
   filedDate: string;
 }
+
+export interface HomeServiceRequest {
+  id: string;
+  clientName: string;
+  vipTier: 'Couture Sovereign' | 'Obsidian Black' | 'Diamond Elite' | 'Signature Guest';
+  phone: string;
+  address: string;
+  city: string;
+  residenceType: 'Private Villa' | 'Penthouse' | 'Luxury Suite' | 'Heritage Estate';
+  salonName: string;
+  salonId: string;
+  artisansAssigned: string[];
+  servicesRequested: string[];
+  scheduledDate: string;
+  scheduledTime: string;
+  estimatedDuration: string;
+  grossAmount: number;
+  advanceDepositRequired: number;
+  advanceDepositPaid: number;
+  depositStatus: 'Pending Deposit' | 'Deposit Verified' | 'Fully Paid' | 'Deposit Failed / Expired';
+  serviceStatus: 'Pending Confirmation' | 'Artisan Dispatched' | 'In Progress' | 'Service Completed' | 'Cancelled';
+  paymentMode: 'Bank RTGS / NEFT' | 'Luxury Concierge Escrow' | 'Gold UPI Terminal' | 'Amex Centurion Hold';
+  utrReference?: string;
+  depositVerifiedBy?: string;
+  depositVerifiedAt?: string;
+  securityPassRequired: boolean;
+  specialNotes?: string;
+}

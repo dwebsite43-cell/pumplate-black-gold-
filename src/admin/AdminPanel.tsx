@@ -40,14 +40,18 @@ import {
   initialDispatches,
   initialVehicles,
   initialComplaints,
+  initialHomeServiceRequests,
 } from './adminData';
+import { HomeServiceRequest } from './types';
 import { OverviewMetrics } from './components/OverviewMetrics';
 import { OnboardingKycTab } from './components/OnboardingKycTab';
 import { FinanceSettlementTab } from './components/FinanceSettlementTab';
 import { OperationsHardwareTab } from './components/OperationsHardwareTab';
 import { RiskRewardsAuditTab } from './components/RiskRewardsAuditTab';
+import { HomeServiceRequestsTab } from './components/HomeServiceRequestsTab';
 import { AuditModal, ADMIN_PRESETS } from './AuditModal';
-import { ShieldCheck, ArrowLeft, History, Users, DollarSign, Layers, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, History, Users, DollarSign, Layers, ShieldAlert, CheckCircle2, Home, Bell } from 'lucide-react';
+import { ProactiveAppointmentAlertModal } from '../notifications/ProactiveAppointmentAlertModal';
 
 interface AdminPanelProps {
   onBackToLanding: () => void;
@@ -58,9 +62,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToLanding }) => {
   const [currentAdminName, setCurrentAdminName] = useState<string>(ADMIN_PRESETS[0]);
 
   // Main Category Tabs
-  const [activeMainTab, setActiveMainTab] = useState<'onboarding' | 'finance' | 'operations' | 'risk_audit'>('onboarding');
+  const [activeMainTab, setActiveMainTab] = useState<'onboarding' | 'finance' | 'operations' | 'risk_audit' | 'home_services'>('home_services');
 
-  // Master State for all 19 entities
+  // Master State for all entities
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(initialAuditLogs);
   const [growthPartners, setGrowthPartners] = useState<GrowthPartner[]>(initialGrowthPartners);
   const [shopsOnboarding, setShopsOnboarding] = useState<ShopOnboarding[]>(initialShopsOnboarding);
@@ -80,6 +84,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToLanding }) => {
   const [dispatches, setDispatches] = useState<DispatchRecord[]>(initialDispatches);
   const [vehicles, setVehicles] = useState<VehicleRecord[]>(initialVehicles);
   const [complaints, setComplaints] = useState<ComplaintAppeal[]>(initialComplaints);
+  const [homeRequests, setHomeRequests] = useState<HomeServiceRequest[]>(initialHomeServiceRequests);
 
   // Audit Modal State
   const [isAuditModalOpen, setIsAuditModalOpen] = useState<boolean>(false);
@@ -102,6 +107,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToLanding }) => {
   });
 
   const [toastMessage, setToastMessage] = useState<string>('');
+  const [isProactiveAlertModalOpen, setIsProactiveAlertModalOpen] = useState<boolean>(false);
 
   const triggerAuditPrompt = (
     entityType: string,
@@ -184,8 +190,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToLanding }) => {
             </div>
           </div>
 
-          {/* Active Admin Operator Switcher */}
+          {/* Active Admin Operator Switcher & 24h Alerts */}
           <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsProactiveAlertModalOpen(true)}
+              className="px-3 py-1.5 bg-[#D4AF37]/20 hover:bg-[#D4AF37]/35 text-[#D4AF37] border border-[#D4AF37]/50 rounded text-xs font-mono flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(212,175,55,0.2)] font-semibold cursor-pointer relative"
+              id="admin-24h-alerts-btn"
+              title="24-Hour Proactive Client Care Engine"
+            >
+              <Bell className="w-3.5 h-3.5 text-[#D4AF37] animate-pulse" />
+              <span>24h Client Alerts</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute -top-1 -right-1"></span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 absolute -top-1 -right-1"></span>
+            </button>
+
             <div className="text-right hidden md:block">
               <span className="text-[10px] font-mono text-gray-400 block uppercase">Active Admin Operator</span>
               <span className="text-xs font-mono text-[#D4AF37] font-semibold">{currentAdminName}</span>
@@ -224,10 +242,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToLanding }) => {
           totalVolume={dailyTransactions.reduce((acc, t) => acc + t.grossAmount, 0) + 3250000}
           fraudAlertsCount={fraudAlerts.filter((f) => f.status !== 'cleared').length}
           pendingSettlementsCount={settlements.filter((s) => s.status === 'pending').length}
+          pendingHomeDepositsCount={homeRequests.filter((r) => r.depositStatus === 'Pending Deposit').length}
+          onSelectHomeServices={() => setActiveMainTab('home_services')}
         />
 
-        {/* Primary 4 Category Tabs */}
+        {/* Primary 5 Category Tabs */}
         <div className="flex flex-wrap gap-3 border-b border-[#D4AF37]/30 pb-4">
+          <button
+            onClick={() => setActiveMainTab('home_services')}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded text-xs font-mono uppercase tracking-wider transition-all relative ${
+              activeMainTab === 'home_services'
+                ? 'metallic-button-strong font-bold'
+                : 'bg-[#0A0A0A] text-gray-400 hover:text-white border border-white/10'
+            }`}
+            id="tab-home-services"
+          >
+            <Home className="w-4 h-4 text-[#D4AF37]" />
+            <span>VIP Home Services</span>
+            {homeRequests.filter((r) => r.depositStatus === 'Pending Deposit').length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono bg-amber-950 text-amber-300 border border-amber-500/50 animate-pulse font-bold ml-1">
+                {homeRequests.filter((r) => r.depositStatus === 'Pending Deposit').length} PENDING DEPOSIT
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => setActiveMainTab('onboarding')}
             className={`flex items-center space-x-2 px-5 py-2.5 rounded text-xs font-mono uppercase tracking-wider transition-all ${
@@ -411,6 +449,50 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToLanding }) => {
             }}
           />
         )}
+
+        {/* Tab 5: Home Service Requests (Admin-only view for advance deposit verification) */}
+        {activeMainTab === 'home_services' && (
+          <HomeServiceRequestsTab
+            requests={homeRequests}
+            onRequestAudit={triggerAuditPrompt}
+            onVerifyDeposit={(id, utr, verifiedBy) => {
+              const now = new Date();
+              const timeStr = `${now.toISOString().slice(0, 10)} ${now.toTimeString().slice(0, 5)} IST`;
+              setHomeRequests((prev) =>
+                prev.map((r) =>
+                  r.id === id
+                    ? {
+                        ...r,
+                        depositStatus: 'Deposit Verified',
+                        utrReference: utr,
+                        depositVerifiedBy: verifiedBy,
+                        depositVerifiedAt: timeStr,
+                      }
+                    : r
+                )
+              );
+            }}
+            onRejectDeposit={(id, reason) => {
+              setHomeRequests((prev) =>
+                prev.map((r) =>
+                  r.id === id
+                    ? {
+                        ...r,
+                        depositStatus: 'Deposit Failed / Expired',
+                        specialNotes: `${r.specialNotes || ''} [Deposit Flagged: ${reason}]`,
+                      }
+                    : r
+                )
+              );
+            }}
+            onUpdateServiceStatus={(id, newStatus) => {
+              setHomeRequests((prev) =>
+                prev.map((r) => (r.id === id ? { ...r, serviceStatus: newStatus } : r))
+              );
+            }}
+            currentAdminName={currentAdminName}
+          />
+        )}
       </main>
 
       {/* Mandatory Audit Modal for every manual edit */}
@@ -426,6 +508,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToLanding }) => {
         proposedNewValue={auditModalConfig.proposedNewValue}
         allowEditNewValue={auditModalConfig.allowEditNewVal}
         onConfirm={handleAuditConfirm}
+      />
+
+      {/* 24h Proactive Client Appointment Care Modal */}
+      <ProactiveAppointmentAlertModal
+        isOpen={isProactiveAlertModalOpen}
+        onClose={() => setIsProactiveAlertModalOpen(false)}
       />
     </div>
   );

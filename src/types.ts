@@ -7,6 +7,14 @@ export interface Service {
   category: string;
 }
 
+export interface StylistPortfolioItem {
+  id: string;
+  title: string;
+  image: string;
+  technique: string;
+  description?: string;
+}
+
 export interface Stylist {
   id: string;
   name: string;
@@ -14,6 +22,13 @@ export interface Stylist {
   rating: number;
   image: string;
   specialties: string[];
+  bio?: string;
+  experienceYears?: number;
+  education?: string;
+  reviewsCount?: number;
+  quote?: string;
+  portfolio?: StylistPortfolioItem[];
+  signatureWork?: string;
 }
 
 export interface SalonTemplate {

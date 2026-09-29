@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sparkles, 
   Smartphone, 
@@ -37,7 +37,13 @@ import {
   Building,
   DollarSign,
   MapPin,
-  Mic
+  Mic,
+  History,
+  Filter,
+  RotateCcw,
+  Gift,
+  Flame,
+  Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -46,9 +52,16 @@ const luxurySalonHero = '/src/assets/images/luxury_salon_hero_1780900665832.png'
 const luxurySpaService = '/src/assets/images/luxury_spa_service_1780900684934.png';
 const luxuryStudioArt = '/src/assets/images/luxury_studio_art_1780900702102.png';
 
-import { salonTemplates, mockAnalytics, sampleRetentionCampaign } from './data';
+import { salonTemplates, mockAnalytics, sampleRetentionCampaign, terminalScansData, TerminalScanRecord } from './data';
 import { SalonTemplate, Service, Stylist } from './types';
 import { AdminPanel } from './admin/AdminPanel';
+import { GrowthPartnerDashboard } from './partner/GrowthPartnerDashboard';
+import { BundledServicesPage } from './bundles/BundledServicesPage';
+import { SeasonalPromotionsCarousel } from './promotions/SeasonalPromotionsCarousel';
+import { MeetYourStylistSection } from './stylists/MeetYourStylistSection';
+import { ShopReviewsSection } from './reviews/ShopReviewsSection';
+import { ProactiveAppointmentAlertModal } from './notifications/ProactiveAppointmentAlertModal';
+import { ProactiveReminderBanner } from './notifications/ProactiveReminderBanner';
 
 const locationMatrix: {
   [key: string]: {
@@ -109,16 +122,24 @@ const locationMatrix: {
 };
 
 export default function App() {
-  // Navigation mode: Landing Showcase vs Admin Panel #22
-  const [viewMode, setViewMode] = useState<'showcase' | 'admin'>('showcase');
+  // Navigation mode: Landing Showcase vs Admin Panel #22 vs Growth Partner Dashboard vs Bundled Services
+  const [viewMode, setViewMode] = useState<'showcase' | 'admin' | 'partner' | 'bundles'>('showcase');
 
   useEffect(() => {
     if (window.location.hash === '#admin') {
       setViewMode('admin');
+    } else if (window.location.hash === '#partner') {
+      setViewMode('partner');
+    } else if (window.location.hash === '#bundles') {
+      setViewMode('bundles');
     }
     const handleHashChange = () => {
       if (window.location.hash === '#admin') {
         setViewMode('admin');
+      } else if (window.location.hash === '#partner') {
+        setViewMode('partner');
+      } else if (window.location.hash === '#bundles') {
+        setViewMode('bundles');
       } else if (window.location.hash === '#showcase' || !window.location.hash) {
         setViewMode('showcase');
       }
@@ -147,10 +168,53 @@ export default function App() {
   const [selectedStylist, setSelectedStylist] = useState<Stylist | null>(salonTemplates[0].stylists[0]);
   const [vipBookingCode, setVipBookingCode] = useState<string>('NEX-VIP-99');
   const [escrowAuthorized, setEscrowAuthorized] = useState<boolean>(false);
+  const [isOpenReviewModal, setIsOpenReviewModal] = useState<boolean>(false);
+  const [isProactiveAlertModalOpen, setIsProactiveAlertModalOpen] = useState<boolean>(false);
 
   // State for QR counter settlement simulator
   const [qrScanned, setQrScanned] = useState<boolean>(false);
   const [qrPaid, setQrPaid] = useState<boolean>(false);
+  const [showRecentScansModal, setShowRecentScansModal] = useState<boolean>(false);
+  const [recentScanSearch, setRecentScanSearch] = useState<string>('');
+  const [recentScanDatePreset, setRecentScanDatePreset] = useState<'all' | 'today' | 'yesterday' | 'last7days' | 'custom'>('all');
+  const [recentScanStartDate, setRecentScanStartDate] = useState<string>('');
+  const [recentScanEndDate, setRecentScanEndDate] = useState<string>('');
+
+  // Filtered terminal scans for Recent Scans Slide-out Modal
+  const filteredRecentScans = useMemo(() => {
+    return terminalScansData.filter((txn) => {
+      // Text search match across guest, id, service, tier, utr, vpa, mode
+      const query = recentScanSearch.trim().toLowerCase();
+      if (query) {
+        const matchesQuery =
+          txn.guest.toLowerCase().includes(query) ||
+          txn.id.toLowerCase().includes(query) ||
+          txn.service.toLowerCase().includes(query) ||
+          txn.tier.toLowerCase().includes(query) ||
+          txn.utr.toLowerCase().includes(query) ||
+          txn.vpa.toLowerCase().includes(query) ||
+          txn.mode.toLowerCase().includes(query);
+        if (!matchesQuery) return false;
+      }
+
+      // Date-range filtering
+      if (recentScanDatePreset === 'today') {
+        return txn.date === '2026-09-28';
+      }
+      if (recentScanDatePreset === 'yesterday') {
+        return txn.date === '2026-09-27';
+      }
+      if (recentScanDatePreset === 'last7days') {
+        return txn.date >= '2026-09-21' && txn.date <= '2026-09-28';
+      }
+      if (recentScanDatePreset === 'custom') {
+        if (recentScanStartDate && txn.date < recentScanStartDate) return false;
+        if (recentScanEndDate && txn.date > recentScanEndDate) return false;
+        return true;
+      }
+      return true;
+    });
+  }, [recentScanSearch, recentScanDatePreset, recentScanStartDate, recentScanEndDate]);
   const [walletBalance, setWalletBalance] = useState<number>(3482500);
   const [vipsRetainedCount, setVipsRetainedCount] = useState<number>(842);
   const [retentionDispatching, setRetentionDispatching] = useState<boolean>(false);
@@ -284,12 +348,46 @@ export default function App() {
     }, 1800);
   };
 
+  if (viewMode === 'partner') {
+    return (
+      <GrowthPartnerDashboard
+        onBackToLanding={() => {
+          setViewMode('showcase');
+          window.location.hash = '';
+        }}
+        onOpenAdminPanel={() => {
+          setViewMode('admin');
+          window.location.hash = 'admin';
+        }}
+      />
+    );
+  }
+
   if (viewMode === 'admin') {
     return (
       <AdminPanel
         onBackToLanding={() => {
           setViewMode('showcase');
           window.location.hash = '';
+        }}
+      />
+    );
+  }
+
+  if (viewMode === 'bundles') {
+    return (
+      <BundledServicesPage
+        onBackToLanding={() => {
+          setViewMode('showcase');
+          window.location.hash = '';
+        }}
+        onOpenPartnerConsole={() => {
+          setViewMode('partner');
+          window.location.hash = 'partner';
+        }}
+        onOpenAdminPanel={() => {
+          setViewMode('admin');
+          window.location.hash = 'admin';
         }}
       />
     );
@@ -308,28 +406,84 @@ export default function App() {
             </span>
           </div>
 
-          <nav className="hidden md:flex items-center space-x-8 text-xs tracking-[0.15em] font-light text-gray-400">
+          <nav className="hidden md:flex items-center space-x-6 text-xs tracking-[0.15em] font-light text-gray-400">
             <a href="#prestige" className="hover:text-[#D4AF37] transition-colors">THE VISION</a>
+            <a href="#seasonal-promotions" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1 text-[#D4AF37] font-semibold">
+              <Flame className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>FESTIVE OFFERS</span>
+            </a>
             <a href="#designer" className="hover:text-[#D4AF37] transition-colors">LIVE BUILDER</a>
+            <a href="#meet-stylists" className="hover:text-[#D4AF37] transition-colors">STYLISTS</a>
+            <a href="#shop-reviews" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1">
+              <Star className="w-3 h-3 text-[#D4AF37] fill-[#D4AF37]" />
+              <span>REVIEWS</span>
+            </a>
+            <button
+              onClick={() => {
+                setViewMode('bundles');
+                window.location.hash = 'bundles';
+              }}
+              className="text-[#D4AF37] hover:text-white transition-colors flex items-center gap-1 font-semibold uppercase tracking-[0.15em] cursor-pointer"
+              id="nav-bundles-btn"
+            >
+              <Gift className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>BUNDLED SERVICES</span>
+              <span className="px-1.5 py-0.5 rounded text-[8px] bg-[#D4AF37] text-black font-bold font-mono ml-0.5">30% OFF</span>
+            </button>
             <a href="#escrow-section" className="hover:text-[#D4AF37] transition-colors">TRUST ESCROW</a>
             <a href="#qr-section" className="hover:text-[#D4AF37] transition-colors">GOLD QR settlements</a>
             <a href="#ai-defense" className="hover:text-[#D4AF37] transition-colors">AI MARKETING</a>
           </nav>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsProactiveAlertModalOpen(true)}
+              className="px-3 py-2 rounded-sm bg-[#D4AF37]/20 hover:bg-[#D4AF37]/35 text-[#D4AF37] border border-[#D4AF37]/50 text-[10px] tracking-[0.15em] uppercase font-mono flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)] font-semibold cursor-pointer relative"
+              id="header-24h-alerts-btn"
+              title="24-Hour Proactive Client Appointment Alerts"
+            >
+              <Bell className="w-3.5 h-3.5 text-[#D4AF37] animate-pulse" />
+              <span className="hidden sm:inline">24h Alerts</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute -top-1 -right-1"></span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 absolute -top-1 -right-1"></span>
+            </button>
+            <button
+              onClick={() => {
+                setViewMode('bundles');
+                window.location.hash = 'bundles';
+              }}
+              className="px-3 py-2 rounded-sm bg-[#D4AF37]/20 hover:bg-[#D4AF37]/35 text-[#D4AF37] border border-[#D4AF37]/50 text-[10px] tracking-[0.15em] uppercase font-mono flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)] font-semibold cursor-pointer"
+              id="header-bundles-btn"
+              title="Open Bundled Services & Bridal Packages"
+            >
+              <Gift className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Bundles</span>
+            </button>
+            <button
+              onClick={() => {
+                setViewMode('partner');
+                window.location.hash = 'partner';
+              }}
+              className="px-3 py-2 rounded-sm bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/40 text-[10px] tracking-[0.15em] uppercase font-mono flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(212,175,55,0.15)]"
+              id="header-partner-btn"
+              title="Open Growth Partner Dashboard"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Partner Console</span>
+            </button>
             <button
               onClick={() => {
                 setViewMode('admin');
                 window.location.hash = 'admin';
               }}
-              className="px-3 py-2 rounded-sm bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/40 text-[10px] tracking-[0.15em] uppercase font-mono flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(212,175,55,0.15)]"
+              className="px-3 py-2 rounded-sm bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/20 text-[10px] tracking-[0.15em] uppercase font-mono flex items-center gap-1.5 transition-all"
               id="header-admin-btn"
               title="Open Nexora Admin Panel #22"
             >
               <Shield className="w-3.5 h-3.5" />
               <span>Admin #22</span>
             </button>
-            <div className="hidden lg:flex flex-col items-end border-r border-[#D4AF37]/25 pr-4 mr-1">
+            <div className="hidden lg:flex flex-col items-end border-r border-[#D4AF37]/25 pr-3 mr-1">
               <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Escrow Pipeline</span>
               <span className="text-xs font-mono text-[#D4AF37] font-semibold">
                 ₹{liveReservationsAmt.toLocaleString()}
@@ -499,6 +653,18 @@ export default function App() {
 
         </div>
       </section>
+
+      {/* 2.2 SEASONAL PROMOTIONS & BRIDAL CAROUSEL */}
+      <SeasonalPromotionsCarousel
+        onNavigateToBundles={() => {
+          setViewMode('bundles');
+          window.location.hash = 'bundles';
+        }}
+        onBookPromotion={(promo) => {
+          setViewMode('bundles');
+          window.location.hash = 'bundles';
+        }}
+      />
 
       {/* 2.5 PRESTIGE CONCIERGE: GEOLOCATION & REAL-TIME SEARCH INDEX */}
       <section id="concierge-index" className="py-24 px-6 bg-[#050505] relative border-b border-[#D4AF37]/10 overflow-hidden">
@@ -1115,6 +1281,91 @@ export default function App() {
         </div>
       </section>
 
+      {/* 3.5 MEET YOUR MASTER STYLISTS & ATELIER ARTISANS */}
+      <MeetYourStylistSection
+        selectedTemplate={selectedTemplate}
+        allTemplates={salonTemplates}
+        onSelectStylist={(stylist) => {
+          setSelectedStylist(stylist);
+        }}
+        onSwitchSalonTemplate={(template) => {
+          setSelectedTemplate(template);
+          setCustomSubdomain(template.slug);
+        }}
+        onNavigateToEscrow={() => {
+          setBookingStep(1);
+        }}
+      />
+
+      {/* 3.8 INDIVIDUAL SHOP REVIEWS & STAR RATINGS */}
+      <ShopReviewsSection
+        selectedTemplate={selectedTemplate}
+        allTemplates={salonTemplates}
+        onSwitchSalonTemplate={(template) => {
+          setSelectedTemplate(template);
+          setCustomSubdomain(template.slug);
+        }}
+        onBookServiceWithStylist={(serviceName, stylistName) => {
+          const svc = selectedTemplate.services.find((s) => s.name === serviceName) || selectedTemplate.services[0];
+          const sty = selectedTemplate.stylists.find((s) => s.name === stylistName) || selectedTemplate.stylists[0];
+          setSelectedService(svc);
+          setSelectedStylist(sty);
+          setBookingStep(1);
+          const escrowEl = document.getElementById('escrow-section');
+          if (escrowEl) {
+            escrowEl.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
+        activeBookingVoucher={{
+          code: vipBookingCode,
+          salonId: selectedTemplate.id,
+          salonName: selectedTemplate.name,
+          serviceName: selectedService?.name || '',
+          stylistName: selectedStylist?.name
+        }}
+        isOpenReviewModalExternal={isOpenReviewModal}
+        onCloseExternalReviewModal={() => setIsOpenReviewModal(false)}
+      />
+
+      {/* EXQUISITE BUNDLED PACKAGES TEASER BANNER */}
+      <section className="py-8 px-6 bg-gradient-to-r from-[#0C0B08] via-[#16130B] to-[#0C0B08] border-y border-[#D4AF37]/35 relative overflow-hidden">
+        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-[350px] h-[350px] gold-glow-radial rounded-full pointer-events-none opacity-25"></div>
+
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/15 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] shrink-0 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
+              <Gift className="w-6 h-6 text-[#D4AF37]" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono uppercase bg-[#D4AF37]/20 text-[#D4AF37] px-2 py-0.5 rounded font-bold border border-[#D4AF37]/30">
+                  NEW • BUNDLED PACKAGES
+                </span>
+                <span className="text-xs font-mono text-emerald-400 font-semibold">SAVE UP TO 35%</span>
+              </div>
+              <h4 className="text-base md:text-lg font-serif text-white tracking-wide">
+                The Royal Bridal Glow Sanctuary &amp; Haute Couture Multi-Service Suites
+              </h4>
+              <p className="text-xs font-light text-gray-400 max-w-2xl leading-relaxed">
+                Book comprehensive bridal trousseau, red carpet gala, or full-day wellness therapies at exclusive multi-service rates with 25% Advance Escrow protection.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setViewMode('bundles');
+              window.location.hash = 'bundles';
+            }}
+            className="metallic-button text-xs font-mono uppercase tracking-wider py-3 px-6 rounded font-bold shrink-0 flex items-center gap-2 shadow-[0_0_20px_rgba(212,175,55,0.25)] cursor-pointer"
+            id="teaser-explore-bundles-btn"
+          >
+            <span>Explore Bundled Services</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </section>
+
       {/* 4. CLINICAL WORKFLOW: THE 25% TRUST ESCROW ENGINE */}
       <section id="escrow-section" className="py-24 px-6 bg-[#111111] relative border-b border-[#D4AF37]/10">
         <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-[500px] h-[500px] gold-glow-radial rounded-full pointer-events-none animate-gold-pulse"></div>
@@ -1222,6 +1473,16 @@ export default function App() {
                                 <span>{sty.rating} ★</span>
                                 <span className="text-gray-600">|</span>
                                 <span className="text-gray-400">{sty.specialties.join(', ')}</span>
+                              </div>
+                              <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-white/5 text-[9px] font-mono">
+                                <span className="text-gray-400">{sty.experienceYears || 10}+ Yrs Experience</span>
+                                <a
+                                  href="#meet-stylists"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[#D4AF37] hover:underline"
+                                >
+                                  Bio &amp; Portfolio →
+                                </a>
                               </div>
                             </div>
                           </div>
@@ -1445,7 +1706,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-4 pt-4">
+                    <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
                       <a
                         href="#qr-section"
                         className="metallic-button-strong py-3 px-8 text-xs tracking-widest uppercase rounded-sm flex items-center space-x-2"
@@ -1456,10 +1717,22 @@ export default function App() {
                       </a>
                       <button
                         onClick={() => {
+                          setIsOpenReviewModal(true);
+                          const revEl = document.getElementById('shop-reviews');
+                          if (revEl) revEl.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="metallic-button py-3 px-6 text-xs uppercase tracking-widest rounded-sm flex items-center space-x-2 border-[#D4AF37]/50 text-[#D4AF37] hover:text-white cursor-pointer"
+                        id="escrow-share-review-btn"
+                      >
+                        <Star className="w-3.5 h-3.5 fill-[#D4AF37]" />
+                        <span>Rate Appointment Experience</span>
+                      </button>
+                      <button
+                        onClick={() => {
                           setBookingStep(1);
                           setEscrowAuthorized(false);
                         }}
-                        className="metallic-button py-3 px-6 text-xs uppercase tracking-widest rounded-sm"
+                        className="metallic-button py-3 px-6 text-xs uppercase tracking-widest rounded-sm text-gray-400 hover:text-white"
                         id="escrow-reset-btn"
                       >
                         Reset Simulator
@@ -1599,7 +1872,7 @@ export default function App() {
 
                 </div>
 
-                <div className="w-full max-w-[240px]">
+                <div className="w-full max-w-[240px] space-y-2">
                   {!qrScanned ? (
                     <button
                       onClick={handleQRPaySimulator}
@@ -1617,6 +1890,18 @@ export default function App() {
                       Reset Scanner
                     </button>
                   )}
+
+                  {/* Small 'View Recent Scans' button below the QR display card */}
+                  <button
+                    onClick={() => setShowRecentScansModal(true)}
+                    className="w-full py-2 px-3 text-[10px] font-mono tracking-wider uppercase rounded bg-[#0A0A0A] hover:bg-[#141414] text-gray-300 hover:text-[#D4AF37] border border-[#D4AF37]/25 hover:border-[#D4AF37]/60 transition-all flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(212,175,55,0.06)] cursor-pointer"
+                    id="view-recent-scans-btn"
+                    title="View last 3 successful transactions for this terminal"
+                  >
+                    <History className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    <span>View Recent Scans</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5"></span>
+                  </button>
                 </div>
 
               </div>
@@ -1704,6 +1989,280 @@ export default function App() {
           </div>
 
         </div>
+
+        {/* SLIDE-OUT MODAL: LAST 3 SUCCESSFUL TRANSACTIONS FOR THIS TERMINAL */}
+        <AnimatePresence>
+          {showRecentScansModal && (
+            <div className="fixed inset-0 z-[100] flex justify-end">
+              {/* Dark Blur Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setShowRecentScansModal(false)}
+                className="fixed inset-0 bg-black/80 backdrop-blur-sm cursor-pointer"
+              />
+
+              {/* Slide-out Drawer Panel */}
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+                className="relative w-full max-w-lg md:max-w-xl bg-[#0A0A0A] border-l-2 border-[#D4AF37]/40 shadow-[0_0_60px_rgba(212,175,55,0.25)] text-white flex flex-col h-full z-10 overflow-hidden"
+                id="recent-scans-slideout-modal"
+              >
+                {/* Top Gold Metallic Accent Bar */}
+                <div className="h-1.5 w-full bg-gradient-to-r from-[#D4AF37] via-[#FFF3B0] to-[#D4AF37]"></div>
+
+                {/* Header with Search and Date-Range Filters */}
+                <div className="p-5 border-b border-[#D4AF37]/20 bg-[#111111]/95 space-y-3.5 shrink-0">
+                  {/* Title & Close */}
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase bg-[#D4AF37]/15 text-[#D4AF37] px-2 py-0.5 rounded border border-[#D4AF37]/35 font-semibold">
+                          NEX-TRM-MUM-01
+                        </span>
+                        <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                          Terminal Active
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-serif font-light text-white tracking-wide">
+                        Recent Terminal Scans
+                      </h3>
+                      <p className="text-[11px] font-mono text-gray-400">
+                        Counter UPI QR Audit Ledger • L&apos;Étoile Flagship Desk #01
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => setShowRecentScansModal(false)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                      id="close-recent-scans-btn"
+                      aria-label="Close"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* 1. Text Search Input */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-[#D4AF37] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={recentScanSearch}
+                      onChange={(e) => setRecentScanSearch(e.target.value)}
+                      placeholder="Search by guest name, Txn ID, service, or UTR..."
+                      className="w-full pl-9 pr-8 py-2 bg-black/80 rounded-lg border border-[#D4AF37]/30 focus:border-[#D4AF37] text-xs font-mono text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/50 transition-all"
+                      id="recent-scans-search-input"
+                    />
+                    {recentScanSearch && (
+                      <button
+                        onClick={() => setRecentScanSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5 transition-colors"
+                        title="Clear search"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 2. Date-Range Filter */}
+                  <div className="space-y-2 pt-1 border-t border-white/5">
+                    <div className="flex items-center justify-between text-[10px] font-mono">
+                      <span className="flex items-center gap-1.5 text-gray-400 uppercase tracking-wider">
+                        <Calendar className="w-3 h-3 text-[#D4AF37]" />
+                        <span>Date Range Filter</span>
+                      </span>
+                      {(recentScanSearch || recentScanDatePreset !== 'all' || recentScanStartDate || recentScanEndDate) && (
+                        <button
+                          onClick={() => {
+                            setRecentScanSearch('');
+                            setRecentScanDatePreset('all');
+                            setRecentScanStartDate('');
+                            setRecentScanEndDate('');
+                          }}
+                          className="text-[10px] font-mono text-gray-400 hover:text-[#D4AF37] flex items-center gap-1 transition-colors"
+                          id="reset-scan-filters-btn"
+                        >
+                          <RotateCcw className="w-2.5 h-2.5 text-[#D4AF37]" />
+                          <span>Clear Filters</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Presets */}
+                    <div className="flex flex-wrap gap-1.5 text-[10px] font-mono">
+                      {[
+                        { id: 'all', label: 'All Records' },
+                        { id: 'today', label: 'Today (28 Sep)' },
+                        { id: 'yesterday', label: 'Yesterday (27 Sep)' },
+                        { id: 'last7days', label: 'Past 7 Days' },
+                        { id: 'custom', label: 'Custom Range' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.id}
+                          onClick={() => setRecentScanDatePreset(preset.id as any)}
+                          className={`px-2.5 py-1 rounded transition-all ${
+                            recentScanDatePreset === preset.id
+                              ? 'bg-[#D4AF37] text-black font-semibold shadow-[0_0_10px_rgba(212,175,55,0.3)]'
+                              : 'bg-black/60 text-gray-400 hover:text-white border border-white/10 hover:border-[#D4AF37]/30'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Custom Date Range Picker inputs when 'custom' selected */}
+                    {recentScanDatePreset === 'custom' && (
+                      <div className="grid grid-cols-2 gap-2 pt-1.5 p-2 bg-black/60 rounded border border-[#D4AF37]/25">
+                        <div>
+                          <label className="block text-[9px] font-mono text-gray-400 mb-1">
+                            Start Date (From):
+                          </label>
+                          <input
+                            type="date"
+                            value={recentScanStartDate}
+                            onChange={(e) => setRecentScanStartDate(e.target.value)}
+                            className="w-full px-2 py-1 bg-black rounded border border-[#D4AF37]/30 text-xs font-mono text-white focus:outline-none focus:border-[#D4AF37]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-gray-400 mb-1">
+                            End Date (To):
+                          </label>
+                          <input
+                            type="date"
+                            value={recentScanEndDate}
+                            onChange={(e) => setRecentScanEndDate(e.target.value)}
+                            className="w-full px-2 py-1 bg-black rounded border border-[#D4AF37]/30 text-xs font-mono text-white focus:outline-none focus:border-[#D4AF37]"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Scans Content */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-gray-400 border-b border-white/5 pb-2">
+                    <span className="flex items-center gap-1.5">
+                      <History className="w-3.5 h-3.5 text-[#D4AF37]" />
+                      <span>TERMINAL SCAN LEDGER</span>
+                    </span>
+                    <span className="text-[#D4AF37] font-semibold">
+                      {filteredRecentScans.length} OF {terminalScansData.length} DISPLAYED
+                    </span>
+                  </div>
+
+                  {/* Empty state when no scans match */}
+                  {filteredRecentScans.length === 0 ? (
+                    <div className="text-center py-12 px-4 space-y-3 bg-black/30 rounded-xl border border-dashed border-white/10">
+                      <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/25 flex items-center justify-center mx-auto text-[#D4AF37]">
+                        <Search className="w-5 h-5 text-[#D4AF37]" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-serif text-white">No Matching Transactions</h4>
+                        <p className="text-xs font-mono text-gray-400 max-w-xs mx-auto">
+                          No terminal scans match your search query or selected date filter.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setRecentScanSearch('');
+                          setRecentScanDatePreset('all');
+                          setRecentScanStartDate('');
+                          setRecentScanEndDate('');
+                        }}
+                        className="px-4 py-1.5 text-xs font-mono text-black bg-[#D4AF37] hover:bg-[#E5C158] rounded transition-colors font-semibold"
+                      >
+                        Reset All Filters
+                      </button>
+                    </div>
+                  ) : (
+                    filteredRecentScans.map((txn, idx) => (
+                      <div
+                        key={txn.id}
+                        className="p-4 rounded-xl bg-[#0F0F0F] border border-[#D4AF37]/25 hover:border-[#D4AF37]/50 transition-all space-y-3 shadow-lg relative"
+                      >
+                        {/* Txn Header */}
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-mono text-[#D4AF37] font-semibold">{txn.id}</span>
+                              <span className="text-[9px] font-mono text-gray-500">#{idx + 1}</span>
+                            </div>
+                            <p className="text-[10px] font-mono text-gray-400 mt-0.5">{txn.relativeTime}</p>
+                          </div>
+
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                            <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                            <span>{txn.badge}</span>
+                          </span>
+                        </div>
+
+                        {/* Guest & Service */}
+                        <div className="p-2.5 bg-black/60 rounded border border-white/5 space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-white font-medium">{txn.guest}</span>
+                            <span className="text-[10px] font-mono text-[#D4AF37]">{txn.tier}</span>
+                          </div>
+                          <p className="text-[11px] text-gray-300 font-serif italic">{txn.service}</p>
+                        </div>
+
+                        {/* Financial 75/25 breakdown */}
+                        <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                          <div className="p-2 bg-black/50 rounded border border-emerald-500/20">
+                            <span className="text-gray-400 block uppercase text-[9px]">Counter 75% Settled:</span>
+                            <span className="text-emerald-400 font-bold text-xs">₹{txn.counter75.toLocaleString()}</span>
+                          </div>
+                          <div className="p-2 bg-black/50 rounded border border-[#D4AF37]/20">
+                            <span className="text-gray-400 block uppercase text-[9px]">Escrow 25% Released:</span>
+                            <span className="text-[#D4AF37] font-semibold text-xs">₹{txn.escrow25.toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {/* Telemetry metadata */}
+                        <div className="pt-2 border-t border-white/5 flex flex-col gap-0.5 text-[9px] font-mono text-gray-500">
+                          <div className="flex justify-between">
+                            <span>Mode: {txn.mode}</span>
+                            <span className="text-gray-400">Gross Val: ₹{txn.gross.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-gray-600">
+                            <span>Ref: {txn.utr}</span>
+                            <span className="text-gray-400">VPA: {txn.vpa}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-5 border-t border-[#D4AF37]/20 bg-[#0F0F0F] space-y-3 shrink-0">
+                  <div className="flex justify-between items-center text-xs font-mono">
+                    <span className="text-gray-400">
+                      Total Settled ({filteredRecentScans.length} {filteredRecentScans.length === 1 ? 'Scan' : 'Scans'}):
+                    </span>
+                    <span className="text-emerald-400 font-bold text-sm">
+                      ₹{filteredRecentScans.reduce((sum, t) => sum + t.counter75, 0).toLocaleString()} Direct Credit
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowRecentScansModal(false)}
+                    className="w-full py-2.5 metallic-button text-xs font-mono uppercase tracking-wider rounded transition-colors"
+                  >
+                    Close Slide-Out Ledger
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </section>
 
       {/* 6. OPERATIONAL SECTION: AI GROWTH & RETENTION CONTROL CENTER */}
@@ -2081,14 +2640,40 @@ export default function App() {
               <ul className="space-y-2.5 text-gray-400">
                 <li><a href="#designer" className="hover:text-white transition-colors">White-Label builder</a></li>
                 <li><a href="#escrow-section" className="hover:text-white transition-colors">Booking Escrow Vault</a></li>
+                <li>
+                  <button 
+                    onClick={() => { setViewMode('bundles'); window.location.hash = 'bundles'; }} 
+                    className="text-[#D4AF37] hover:underline flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+                  >
+                    ★ Bundled Services &amp; Bridal Packages (30% Privilege)
+                  </button>
+                </li>
+                <li><a href="#meet-stylists" className="text-gray-400 hover:text-white transition-colors">★ Meet Master Stylists &amp; Portfolios</a></li>
+                <li><a href="#shop-reviews" className="text-[#D4AF37] hover:underline flex items-center gap-1 transition-colors">★ Guest Reviews &amp; Star Ratings</a></li>
                 <li><a href="#qr-section" className="hover:text-white transition-colors">Gold Counter QR Display</a></li>
                 <li><a href="#ai-defense" className="hover:text-white transition-colors">AI WhatsApp Concierge</a></li>
                 <li>
                   <button 
-                    onClick={() => { setViewMode('admin'); window.location.hash = 'admin'; }} 
+                    onClick={() => { setViewMode('partner'); window.location.hash = 'partner'; }} 
                     className="text-[#D4AF37] hover:underline flex items-center gap-1 font-semibold transition-colors"
                   >
+                    ★ Growth Partner Dashboard
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => { setViewMode('admin'); window.location.hash = 'admin'; }} 
+                    className="text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+                  >
                     ★ Admin Panel #22 (HQ Live)
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => { setViewMode('admin'); window.location.hash = 'admin'; }} 
+                    className="text-amber-400 hover:underline flex items-center gap-1 text-[10px] font-mono transition-colors"
+                  >
+                    ⚡ VIP Home Service Deposits (Audit Desk)
                   </button>
                 </li>
               </ul>
@@ -2132,6 +2717,23 @@ export default function App() {
 
         </div>
       </footer>
+
+      {/* 24-HOUR PROACTIVE APPOINTMENT ALERT SYSTEM */}
+      <ProactiveAppointmentAlertModal
+        isOpen={isProactiveAlertModalOpen}
+        onClose={() => setIsProactiveAlertModalOpen(false)}
+        onSelectSalon={(salonId) => {
+          const salon = salonTemplates.find((s) => s.id === salonId);
+          if (salon) {
+            setSelectedTemplate(salon);
+            setCustomSubdomain(salon.slug);
+          }
+        }}
+      />
+
+      <ProactiveReminderBanner
+        onOpenCommandDesk={() => setIsProactiveAlertModalOpen(true)}
+      />
 
     </div>
   );
